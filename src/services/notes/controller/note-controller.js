@@ -2,6 +2,7 @@ import { nanoid } from 'nanoid';
 import { InvariantError, NotFoundError } from '../../../exceptions/index.js';
 import response from '../../../utils/response.js';
 import NoteRepositories from '../repositories/note-repositories.js';
+import AuthorizationError from '../../../exceptions/authorization-error.js';
 
 
 
@@ -10,7 +11,8 @@ export const createNote = async (req, res, next) => {
 	const note = await NoteRepositories.createNote({
 		title,
 		body,
-		tags
+		tags,
+		owner
 	});
 	
 	if (!note) {
@@ -23,13 +25,22 @@ export const createNote = async (req, res, next) => {
 };
 
 export const getNotes = async (req, res) => {
-  const notes = await NoteRepositories.getNotes();
+	const {id: owner} = req.user;
+  const notes = await NoteRepositories.getNotes(owner);
   return response(res, 200, 'Catatan sukses ditampilkan', notes);
   
 };
 
 export const getNoteById = async (req, res, next) => {
 	const {id} = req.params;
+	const {id: owner} = req.user;
+	
+	const isOwner = await NoteRepositories.verifyNoteOwner(id, owner);
+	if (!isOwner) {
+		return next(new AuthorizationError('Anda tidak berhak berhasil mengakses resource ini'));
+		
+	}
+	
 	const note = await NoteRepositories.getNoteById(id);
 	
 	if (!note) {
@@ -45,12 +56,23 @@ export const editNoteById = (req, res, next) => {
   const { id } = req.params;
   const { title, tags, body } = req.validated;
   
+  
+  const {id: owner} = req.user;
+  
+  const isOwner = await NoteRepositories.verifyNoteOwner(id, owner);
+  if (!isOwner) {
+	  return next(new AuthorizationError('Anda tidak berhak mengakses resource ini'));
+	  
+  }
+  
   const note = await NoteRepositories.editNote({
 	  id,
 	  title,
 	  body,
 	  tags
   });
+  
+  
   
   if(!note) {
 	  return next(new NotFoundError('Catatan tidak ditemukan'));
@@ -62,6 +84,14 @@ export const editNoteById = (req, res, next) => {
 
 export const deleteNoteById = async (req, res, next) => {
   const { id } = req.params;
+  const {id: owner} = req.user;
+  
+  const isOwner = await NoteRepositories.verifyNoteOwner(id, owner);
+  if (!isOwner) {
+	  return next(new AuthorizationError('Anda tidak berhak mengakses resource'));
+	  
+  }
+  
   const deletedNote = await NoteRepositories.deleteNote(id);
   
   if (!deletedNote) {

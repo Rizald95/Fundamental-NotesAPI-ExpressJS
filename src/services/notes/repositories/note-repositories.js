@@ -14,8 +14,8 @@ class NotesRepositories {
 		const updatedAt = createdAt;
 		
 		const query = {
-			text: 'INSERT INTO notes(id, title, body, tags, created_at, updated_at) VALUES($1, $2, $3, $4, $5, $6) RETURNING id, title, body, tags, created_at, updated_at',
-			values: [id, title, body, tags, createdAt, updatedAt],
+			text: 'INSERT INTO notes(id, title, body, tags, created_at, updated_at, owner) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id, title, body, tags, created_at, updated_at, owner',
+			values: [id, title, body, tags, createdAt, updatedAt, owner],
 		}:
 		
 		const result = await this.pool.query(query);
@@ -25,7 +25,12 @@ class NotesRepositories {
 	}
 	
 	async getNotes() {
-		const result = await this.pool.query('SELECT * FROM notes');
+		const query = {
+			text: 'SELECT * FROM notes WHERE owner = $1',
+			values: [owner],
+		};
+		
+		const result = await this.pool.query(query);
 		return result.rows;
 		
 	}
@@ -66,6 +71,24 @@ class NotesRepositories {
 		
 		return result.rows[0].id;
 		
+	}
+	
+	async verifyNoteOwner(id, owner) {
+		const query = {
+			text: 'SELECT * FROM notes WHERE id = $1',
+			values: [id],
+		};
+		
+		const result = await this.pool.query(query);
+		if (!result.rows.length) {
+			return null;
+		}
+		const note = result.rows[0];
+		if (note.owner !== owner) {
+			return null;
+		}
+		
+		return result.rows[0];
 	}
 	
 }
