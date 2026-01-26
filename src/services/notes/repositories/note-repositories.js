@@ -1,11 +1,13 @@
 import { Pool } from 'pg';
 import {nanoid} from 'nanoid';
-import pkg from 'pg';
+import collaborationRepositories from '../../collaborations/repositories/collaboration-repositories';
+ 
 
 
 class NotesRepositories {
 	constructor() {
 		this.pool = new Pool();
+		this.collaborationRepositories = collaborationRepositories;
 	}
 	
 	async createNote({title, body, tags}) {
@@ -26,7 +28,10 @@ class NotesRepositories {
 	
 	async getNotes() {
 		const query = {
-			text: 'SELECT * FROM notes WHERE owner = $1',
+			text: `SELECT notes.* FROM notes
+			LEFT JOIN collaborations ON collaborations.note_id = notes.id
+			WHERE notes.owner = $1 OR collaborations.user_id = $1
+			GROUP BY notes.id`,
 			values: [owner],
 		};
 		
@@ -89,6 +94,16 @@ class NotesRepositories {
 		}
 		
 		return result.rows[0];
+	}
+	
+	async verifyNoteAccess(noteId, userId) {
+		const ownerResult = await this.verifyNoteOwner(noteId, userId);
+		if (ownerResult) {
+			return ownerResult;
+		}
+ 
+		const result =  await this.collaborationRepositories.verifyCollaborator(noteId, userId);
+		return result.rowCount > 0;
 	}
 	
 }
