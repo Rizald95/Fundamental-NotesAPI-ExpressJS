@@ -1,0 +1,8 @@
+1. Pertama, katakanlah User A melakukan permintaan ke Notes API untuk mengekspor catatan yang ia miliki. hasil ekspor nantinya akan dikirimkan melalui email. jadi, ia harus melampirkan alamat email tujuan pada body request.
+2. Kedua, Notes API menerima permintaan tersebut. Kemudian , membuat serta mengirim pesan ke queue dengan biffer yang berisi identitas pengguna (dapat dari access token) dan alamat email tujuan
+3. ketiga, queue menerima pesan tersebut dan mengirimkannya ke consumer
+4. Keempat, consumer mengonsumsi pesan , kemudian mengambil catatan dari database sesuai dengan identitas user yang dilampirkan pada pesan.
+5. Kelima, database mengembalikan data yang diminta oleh consumer.
+6. Keenam, consumer mengolah data yang dihasilkan database ke bentuk berkas JSON sebagai lampiran dari email yang akan dikirim ke alamat email tujuan.
+
+
