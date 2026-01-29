@@ -28,7 +28,8 @@
     "nanoid": "^5.1.6",
     "node-pg-migrate": "^8.0.4",
     "nodemailer": "^7.0.12",
-    "pg": "^8.17.2"
+    "pg": "^8.17.2",
+    "redis": "^5.10.0"
   },
   "devDependencies": {
     "nodemon": "^3.1.11"

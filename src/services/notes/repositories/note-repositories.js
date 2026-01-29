@@ -1,13 +1,17 @@
 import { Pool } from 'pg';
 import {nanoid} from 'nanoid';
 import collaborationRepositories from '../../collaborations/repositories/collaboration-repositories';
- 
+import CacheService from '../../../cache/redis-config.js';
+
+
 
 
 class NotesRepositories {
 	constructor() {
 		this.pool = new Pool();
 		this.collaborationRepositories = collaborationRepositories;
+		this.cacheService = new CacheService();
+		
 	}
 	
 	async createNote({title, body, tags}) {
@@ -21,23 +25,31 @@ class NotesRepositories {
 		}:
 		
 		const result = await this.pool.query(query);
+		await this.cacheService.delete(`notes:${owner}`);
 		
 		return result.rows[0];
 		
 	}
 	
 	async getNotes() {
-		const query = {
+		const cacheKey = `notes:${owner}`;
+		
+		try {
+			
+		} catch (error) {
+			const query = {
 			text: `SELECT notes.* FROM notes
 			LEFT JOIN collaborations ON collaborations.note_id = notes.id
 			WHERE notes.owner = $1 OR collaborations.user_id = $1
 			GROUP BY notes.id`,
 			values: [owner],
-		};
+			};
 		
-		const result = await this.pool.query(query);
-		return result.rows;
-		
+			const result = await this.pool.query(query);
+			
+			await this.cacheService.set(cacheKey, JSON.stringify(result.rows));
+			return result.rows;
+		}
 	}
 	
 	async getNoteById(id) {
@@ -61,6 +73,10 @@ class NotesRepositories {
 		};
 		
 		const result = await this.pool.query(query);
+		const owner = result.rows[0].owner;
+		if (result.rows[0]) {
+			await this.cacheService.delete(`notes:${owner}`);
+		}
 		
 		return result.rows[0];
 		
@@ -73,6 +89,10 @@ class NotesRepositories {
 		};
 		
 		const result = await this.pool.query(query);
+		const owner = result.rows[0].owner;
+		if (result.rows[0]) {
+			await this.cacheService.delete(`notes:${owner}`);
+		}
 		
 		return result.rows[0].id;
 		
