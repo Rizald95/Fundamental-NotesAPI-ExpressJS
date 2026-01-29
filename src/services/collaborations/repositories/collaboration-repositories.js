@@ -1,5 +1,7 @@
 import { Pool } from 'pg';
 import { nanoid } from 'nanoid';
+import CacheService from '../../../cache/redis-service.js';
+
 
 class CollaborationRepositories {
 	constructor() {

@@ -1,7 +1,7 @@
 import { Pool } from 'pg';
 import {nanoid} from 'nanoid';
 import collaborationRepositories from '../../collaborations/repositories/collaboration-repositories';
-import CacheService from '../../../cache/redis-config.js';
+import CacheService from '../../../cache/redis-service.js';
 
 
 
