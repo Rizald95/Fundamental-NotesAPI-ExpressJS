@@ -1,0 +1,832 @@
+openapi: 3.0.3
+info:
+  title: Notes API
+  description: |
+    RESTful API untuk aplikasi catatan (Notes) dengan fitur kolaborasi, export, dan upload gambar.
+    
+    ## Fitur Utama:
+    - User Registration & Authentication
+    - CRUD Notes dengan Tags
+    - Collaboration (berbagi notes dengan user lain)
+    - Export Notes via Email (RabbitMQ)
+    - Upload Images (AWS S3 / Local Storage)
+    
+    ## Authentication
+    API ini menggunakan JWT Bearer Token untuk autentikasi.
+    - Dapatkan access token dengan login
+    - Gunakan access token di header: `Authorization: Bearer <token>`
+    - Refresh token jika access token expired
+    
+  version: 1.0.0
+  contact:
+    name: API Support
+    email: support@notesapi.com
+servers:
+  - url: http://localhost:5000/api/v1
+    description: Development server
+  - url: https://api.notesapp.com/api/v1
+    description: Production server
+
+tags:
+  - name: Users
+    description: User management endpoints
+  - name: Authentications
+    description: Authentication & authorization endpoints
+  - name: Notes
+    description: Notes CRUD operations
+  - name: Collaborations
+    description: Collaboration management untuk berbagi notes
+  - name: Exports
+    description: Export notes via email
+  - name: Uploads
+    description: Upload images
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Access Token dari endpoint login
+  
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "user-1234567890"
+        username:
+          type: string
+          example: "johndoe"
+        fullname:
+          type: string
+          example: "John Doe"
+    
+    Note:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "note-1234567890"
+        title:
+          type: string
+          maxLength: 50
+          example: "My First Note"
+        body:
+          type: string
+          example: "This is the content of my note"
+        tags:
+          type: array
+          items:
+            type: string
+          example: ["personal", "important"]
+        owner:
+          type: string
+          example: "user-1234567890"
+        createdAt:
+          type: string
+          format: date-time
+          example: "2024-01-23T10:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2024-01-23T15:45:00Z"
+    
+    Collaboration:
+      type: object
+      properties:
+        id:
+          type: string
+          example: "collab-1234567890"
+        noteId:
+          type: string
+          example: "note-1234567890"
+        userId:
+          type: string
+          example: "user-0987654321"
+    
+    SuccessResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [success]
+          example: "success"
+        message:
+          type: string
+          example: "Operation successful"
+        data:
+          type: object
+          description: Response data (varies by endpoint)
+    
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [fail, error]
+          example: "fail"
+        message:
+          type: string
+          example: "Error message"
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - Token tidak valid atau tidak ada
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: fail
+            message: "Token tidak valid"
+    
+    NotFound:
+      description: Resource tidak ditemukan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: fail
+            message: "Resource tidak ditemukan"
+    
+    Forbidden:
+      description: Forbidden - Tidak memiliki akses
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            status: fail
+            message: "Anda tidak berhak mengakses resource ini"
+
+paths:
+  /users:
+    post:
+      tags:
+        - Users
+      summary: Register user baru
+      description: Endpoint untuk mendaftarkan user baru ke sistem
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+                - fullname
+              properties:
+                username:
+                  type: string
+                  minLength: 3
+                  maxLength: 50
+                  example: "johndoe"
+                password:
+                  type: string
+                  minLength: 6
+                  example: "password123"
+                fullname:
+                  type: string
+                  example: "John Doe"
+      responses:
+        '201':
+          description: User berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          userId:
+                            type: string
+                            example: "user-1234567890"
+              example:
+                status: success
+                message: "User berhasil ditambahkan"
+                data:
+                  userId: "user-1234567890"
+        '400':
+          description: Bad Request - Data tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: fail
+                message: "Username sudah terdaftar"
+
+  /users/{id}:
+    get:
+      tags:
+        - Users
+      summary: Get user by ID
+      description: Mendapatkan informasi user berdasarkan ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "user-1234567890"
+      responses:
+        '200':
+          description: User ditemukan
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          user:
+                            $ref: '#/components/schemas/User'
+              example:
+                status: success
+                data:
+                  user:
+                    id: "user-1234567890"
+                    username: "johndoe"
+                    fullname: "John Doe"
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /authentications:
+    post:
+      tags:
+        - Authentications
+      summary: Login
+      description: Login untuk mendapatkan access token dan refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: "johndoe"
+                password:
+                  type: string
+                  format: password
+                  example: "password123"
+      responses:
+        '201':
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken:
+                            type: string
+                            example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                          refreshToken:
+                            type: string
+                            example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+              example:
+                status: success
+                message: "Authentication berhasil ditambahkan"
+                data:
+                  accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  refreshToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '401':
+          description: Kredensial salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: fail
+                message: "Kredensial yang Anda berikan salah"
+    
+    put:
+      tags:
+        - Authentications
+      summary: Refresh access token
+      description: Mendapatkan access token baru menggunakan refresh token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Access token berhasil diperbarui
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          accessToken:
+                            type: string
+              example:
+                status: success
+                message: "Access Token berhasil diperbarui"
+                data:
+                  accessToken: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+        '400':
+          description: Refresh token tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: fail
+                message: "Refresh token tidak valid"
+    
+    delete:
+      tags:
+        - Authentications
+      summary: Logout
+      description: Menghapus refresh token dari database (logout)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+                  example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+      responses:
+        '200':
+          description: Logout berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                status: success
+                message: "Refresh token berhasil dihapus"
+        '400':
+          description: Refresh token tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /notes:
+    post:
+      tags:
+        - Notes
+      summary: Create note baru
+      description: Membuat catatan baru (requires authentication)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - body
+                - tags
+              properties:
+                title:
+                  type: string
+                  maxLength: 50
+                  example: "Meeting Notes"
+                body:
+                  type: string
+                  example: "Discussion about project timeline and deliverables"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: ["work", "important"]
+      responses:
+        '201':
+          description: Note berhasil dibuat
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          noteId:
+                            type: string
+              example:
+                status: success
+                message: "Catatan berhasil ditambahkan"
+                data:
+                  noteId: "note-1234567890"
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    
+    get:
+      tags:
+        - Notes
+      summary: Get all notes
+      description: Mendapatkan semua notes milik user (includes collaborated notes)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: title
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter notes berdasarkan title
+          example: "Meeting"
+      responses:
+        '200':
+          description: Notes berhasil diambil
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          notes:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/Note'
+              example:
+                status: success
+                data:
+                  notes:
+                    - id: "note-1234567890"
+                      title: "Meeting Notes"
+                      body: "Discussion about project"
+                      tags: ["work", "important"]
+                      owner: "user-1234567890"
+                      createdAt: "2024-01-23T10:30:00Z"
+                      updatedAt: "2024-01-23T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notes/{id}:
+    get:
+      tags:
+        - Notes
+      summary: Get note by ID
+      description: Mendapatkan detail note berdasarkan ID
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "note-1234567890"
+      responses:
+        '200':
+          description: Note ditemukan
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          note:
+                            $ref: '#/components/schemas/Note'
+              example:
+                status: success
+                data:
+                  note:
+                    id: "note-1234567890"
+                    title: "Meeting Notes"
+                    body: "Discussion about project"
+                    tags: ["work"]
+                    owner: "user-1234567890"
+                    createdAt: "2024-01-23T10:30:00Z"
+                    updatedAt: "2024-01-23T10:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    put:
+      tags:
+        - Notes
+      summary: Update note
+      description: Mengupdate note berdasarkan ID (hanya owner yang bisa update)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "note-1234567890"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                  maxLength: 50
+                  example: "Updated Meeting Notes"
+                body:
+                  type: string
+                  example: "Updated content"
+                tags:
+                  type: array
+                  items:
+                    type: string
+                  example: ["work", "updated"]
+      responses:
+        '200':
+          description: Note berhasil diupdate
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                status: success
+                message: "Catatan berhasil diperbarui"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    
+    delete:
+      tags:
+        - Notes
+      summary: Delete note
+      description: Menghapus note berdasarkan ID (hanya owner yang bisa delete)
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          example: "note-1234567890"
+      responses:
+        '200':
+          description: Note berhasil dihapus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                status: success
+                message: "Catatan berhasil dihapus"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /collaborations:
+    post:
+      tags:
+        - Collaborations
+      summary: Add collaboration
+      description: Menambahkan kolaborator ke note (berbagi note dengan user lain)
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - noteId
+                - userId
+              properties:
+                noteId:
+                  type: string
+                  example: "note-1234567890"
+                userId:
+                  type: string
+                  example: "user-0987654321"
+                  description: User ID yang akan diajak kolaborasi
+      responses:
+        '201':
+          description: Collaboration berhasil ditambahkan
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          collaborationId:
+                            type: string
+              example:
+                status: success
+                message: "Kolaborasi berhasil ditambahkan"
+                data:
+                  collaborationId: "collab-1234567890"
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    
+    delete:
+      tags:
+        - Collaborations
+      summary: Delete collaboration
+      description: Menghapus kolaborator dari note
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - noteId
+                - userId
+              properties:
+                noteId:
+                  type: string
+                  example: "note-1234567890"
+                userId:
+                  type: string
+                  example: "user-0987654321"
+      responses:
+        '200':
+          description: Collaboration berhasil dihapus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                status: success
+                message: "Kolaborasi berhasil dihapus"
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /export/notes:
+    post:
+      tags:
+        - Exports
+      summary: Export notes via email
+      description: |
+        Mengirim notes user ke email menggunakan message queue (RabbitMQ).
+        Notes akan dikirim dalam format yang sudah di-export.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - targetEmail
+              properties:
+                targetEmail:
+                  type: string
+                  format: email
+                  example: "user@example.com"
+                  description: Email tujuan untuk menerima export notes
+      responses:
+        '201':
+          description: Export request berhasil diproses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                status: success
+                message: "Permintaan Anda dalam antrean"
+        '400':
+          description: Bad Request - Email tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /upload/images:
+    post:
+      tags:
+        - Uploads
+      summary: Upload image
+      description: |
+        Upload gambar ke server (AWS S3 atau Local Storage).
+        Gambar akan disimpan dan URL-nya akan dikembalikan.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+                - image
+              properties:
+                image:
+                  type: string
+                  format: binary
+                  description: File gambar yang akan diupload (JPEG, PNG, etc.)
+      responses:
+        '201':
+          description: Image berhasil diupload
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessResponse'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          fileLocation:
+                            type: string
+                            format: uri
+                            example: "https://s3.amazonaws.com/bucket/images/image-123.jpg"
+              example:
+                status: success
+                message: "Gambar berhasil diunggah"
+                data:
+                  fileLocation: "https://s3.amazonaws.com/bucket/images/image-123.jpg"
+        '400':
+          description: Bad Request - File tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                status: fail
+                message: "Format file tidak didukung"
+        '401':
+          $ref: '#/components/responses/Unauthorized'

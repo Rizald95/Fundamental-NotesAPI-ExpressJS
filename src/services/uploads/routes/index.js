@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { uploadImages } from '../controllers/upload-controller.js';
+import { uploadImages } from '../controller/upload-controller.js';
 import authenticateToken from '../../../middlewares/auth.js';
 import { upload } from '../storage/storage-config.js';
  

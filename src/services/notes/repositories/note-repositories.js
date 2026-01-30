@@ -1,15 +1,13 @@
 import { Pool } from 'pg';
 import {nanoid} from 'nanoid';
-import collaborationRepositories from '../../collaborations/repositories/collaboration-repositories';
+import CollaborationRepositories from '../../collaborations/repositories/collaboration-repositories.js';
 import CacheService from '../../../cache/redis-service.js';
-
-
 
 
 class NotesRepositories {
 	constructor() {
 		this.pool = new Pool();
-		this.collaborationRepositories = collaborationRepositories;
+		this.collaborationRepositories = CollaborationRepositories;
 		this.cacheService = new CacheService();
 		
 	}
@@ -22,7 +20,7 @@ class NotesRepositories {
 		const query = {
 			text: 'INSERT INTO notes(id, title, body, tags, created_at, updated_at, owner) VALUES($1, $2, $3, $4, $5, $6, $7) RETURNING id, title, body, tags, created_at, updated_at, owner',
 			values: [id, title, body, tags, createdAt, updatedAt, owner],
-		}:
+		};
 		
 		const result = await this.pool.query(query);
 		await this.cacheService.delete(`notes:${owner}`);
@@ -69,7 +67,7 @@ class NotesRepositories {
 		
 		const query = {
 			text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id',
-			values; [title, body, tags, updatedAt, id],
+			values: [title, body, tags, updatedAt, id],
 		};
 		
 		const result = await this.pool.query(query);

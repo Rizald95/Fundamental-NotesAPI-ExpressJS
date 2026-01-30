@@ -1,8 +1,7 @@
 import express from 'express';
 import routes from '../routes/index.js';
-import ErrorHandler from '../middlewares/error.js'; 
+import ErrorHandler from '../middlewares/error.js';
 import { swaggerUi, swaggerDocument, swaggerOptions } from '../swagger-config.js';
- 
  
 const app = express();
  

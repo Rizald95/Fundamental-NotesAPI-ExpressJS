@@ -12,7 +12,7 @@ class StorageService {
     });
   }
   
-  writeFile(file, meta) {
+  async writeFile(file, meta) {
 	  const parameter = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: meta.filename,

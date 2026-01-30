@@ -8,6 +8,8 @@ import AuthorizationError from '../../../exceptions/authorization-error.js';
 
 export const createNote = async (req, res, next) => {
 	const {title, body, tags } = req.validated;
+	const {id: owner} = req.user;
+	
 	const note = await NoteRepositories.createNote({
 		title,
 		body,
@@ -52,7 +54,7 @@ export const getNoteById = async (req, res, next) => {
 	
 };
 
-export const editNoteById = (req, res, next) => {
+export const editNoteById = async (req, res, next) => {
   const { id } = req.params;
   const { title, tags, body } = req.validated;
   

@@ -12,7 +12,7 @@ const TokenManager = {
 		} catch (error) {
 			console.log(error);
 			throw new InvariantError('Refresh token tidak valid');
-   },
+   }
    
    
  },
