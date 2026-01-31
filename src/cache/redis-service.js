@@ -12,6 +12,10 @@ class CacheService {
 	this._client.on('error', (error) => {
 		console.error(error);
 	});
+	
+	this._client.on('connect', () => {
+		console.log('Redis Client Connected');
+	});
 
 	this._client.connect();
 	
@@ -49,7 +53,18 @@ class CacheService {
   }
   
   async quit() {
-	  await this._pool.quit();
+	  try {
+		  await this._client.quit();
+		  
+	  } catch (error) {
+		  console.error('REDIS QUIT error: ', error);
+		  throw error
+	  }
+  }
+  
+  //Get client for session store
+  getClient() {
+	  return this._client;
   }
 }
 
