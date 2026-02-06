@@ -16,7 +16,7 @@ const validate = (schema) => (req, res, next) => {
 export const validateQuery = (schema) => (req, res, next) => {
 	const {error, value } = schema.validate(req.query , {
 		abortEarly: false,
-		allowUnkown: false,
+		allowUnknown: false,
 		stripUnknown: true
 	});
 	
@@ -30,7 +30,7 @@ export const validateQuery = (schema) => (req, res, next) => {
 export const validateParams = (schema) => (req, res, next) => {
 	const {error, value} = schema.validate(req.params, {
 		abortEarly: false,
-		allowUnkown: false,
+		allowUnknown: false,
 		stripUnknown: true
 	});
 	

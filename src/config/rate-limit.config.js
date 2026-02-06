@@ -40,6 +40,8 @@ import CacheService from '../cache/redis-service.js';
 	 	
  }
  
+ const redisStore = new RedisStore();
+ 
  	 //standard handler untuk rate limit exceeded
 	 const standardHandler = (req, res) => {
 		 res.status(429).json({
@@ -56,6 +58,7 @@ import CacheService from '../cache/redis-service.js';
 		 message: 'Terlalu banyak request dari IP ini, silahkan coba lagi setelah 15 menit',
 		 standardHeaders: true, 	//return rate limit info in headers
 		 legacyHeaders: false,
+		 store: redisStore,
 		 handler: standardHandler,
 	 });
 	 
@@ -65,6 +68,7 @@ import CacheService from '../cache/redis-service.js';
 		 max: 5,	//limit 5 login attempts per 15 minutes
 		 skipSuccessfulRequests: true, 	
 		 message: 'Terlalu banyak percobaan login, silahkan coba lagi setelah 15 menit',
+		 store: redisStore,
 		 handler: standardHandler,
 	 });
 	 
@@ -73,6 +77,7 @@ import CacheService from '../cache/redis-service.js';
 		 windowMs: 60 * 1000,	// 1 minute
 		 max: 10,	// Limit 10 write operations per minute
 		 message: 'Terlalu banyak operasi tulis, silahkan coba lagi setelah 1 menit',
+		 store: redisStore,
 		 handler: standardHandler,
 	 });
 	 
@@ -81,6 +86,7 @@ import CacheService from '../cache/redis-service.js';
 		 windowMs: 60 * 60 * 1000,	// 1 hour
 		 max: 20,	// Limit 20 uploads per hour
 		 message: 'Terlalu banyak upload file, silahkan coba lagi setelah 1 jam',
+		 store: redisStore,
 		 handler: standardHandler,
 	 });
 	 
@@ -89,6 +95,7 @@ import CacheService from '../cache/redis-service.js';
 		 windowMs:	60 * 1000, 	// 1 minute
 		 max: 30,	// Limit 30 read operations per minute
 		 message: 'Terlalu banyak request, silahkan coba lagi setelah 1 menit',
+		 store: redisStore,
 		 handler: standardHandler,
 	 });
 	 
@@ -97,6 +104,7 @@ import CacheService from '../cache/redis-service.js';
 		windowMs: 60 * 60 * 1000,	// 1 hour
 		max: 5,	//limit 5 exports per hour
 		message: 'Terlalu banyak request export, silahkan coba lagi setelah 1 jam',
+		store: redisStore,
 		handler: standardHandler,
 	});
 	

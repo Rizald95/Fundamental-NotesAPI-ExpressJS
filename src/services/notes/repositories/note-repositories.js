@@ -12,7 +12,7 @@ class NotesRepositories {
 		
 	}
 	
-	async createNote({title, body, tags}) {
+	async createNote({title, body, tags, owner}) {
 		const id = nanoid(16);
 		const createdAt = new Date().toISOString();
 		const updatedAt = createdAt;
@@ -29,25 +29,34 @@ class NotesRepositories {
 		
 	}
 	
-	async getNotes() {
+	async getNotes(owner) {
 		const cacheKey = `notes:${owner}`;
 		
 		try {
+			const cachedNotes = await this.cacheService.get(cacheKey);
+			if (cachedNotes) {
+				return JSON.parse(cachedNotes);
+			}
+		} catch (error) {
+			console.error('REDIS GET error: ', error);
+		}
+		const query = {
+		text: `SELECT notes.* FROM notes
+		LEFT JOIN collaborations ON collaborations.note_id = notes.id
+		WHERE notes.owner = $1 OR collaborations.user_id = $1
+		GROUP BY notes.id`,
+		values: [owner],
+		};
+	
+		const result = await this.pool.query(query);
+		
+		try {
+			await this.cacheService.set(cacheKey, JSON.stringify(result.rows));
 			
 		} catch (error) {
-			const query = {
-			text: `SELECT notes.* FROM notes
-			LEFT JOIN collaborations ON collaborations.note_id = notes.id
-			WHERE notes.owner = $1 OR collaborations.user_id = $1
-			GROUP BY notes.id`,
-			values: [owner],
-			};
-		
-			const result = await this.pool.query(query);
-			
-			await this.cacheService.set(cacheKey, JSON.stringify(result.rows));
-			return result.rows;
+			console.error('REDIS SET error: ', error)
 		}
+		return result.rows;
 	}
 	
 	async getNoteById(id) {
@@ -66,7 +75,7 @@ class NotesRepositories {
 		const updatedAt = new Date().toISOString();
 		
 		const query = {
-			text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id',
+			text: 'UPDATE notes SET title = $1, body = $2, tags = $3, updated_at = $4 WHERE id = $5 RETURNING id, owner',
 			values: [title, body, tags, updatedAt, id],
 		};
 		
@@ -82,7 +91,7 @@ class NotesRepositories {
 	
 	async deleteNote(id) {
 		const query = {
-			text: 'DELETE FROM notes WHERE id = $1 RETURNING id',
+			text: 'DELETE FROM notes WHERE id = $1 RETURNING id, owner',
 			values: [id], 
 		};
 		
